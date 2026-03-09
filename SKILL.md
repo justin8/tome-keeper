@@ -1,9 +1,9 @@
 ---
-name: ebook-library-manager
+name: tome-keeper
 description: Manage ebook libraries using Calibre's ebook-meta tool. Use this skill when users mention organizing ebooks, fixing book metadata, managing EPUB/MOBI/AZW files, searching their book collection, cleaning up library metadata, or working with Calibre. Also trigger for tasks involving book titles, authors, series information, ISBNs, or organizing digital reading collections.
 ---
 
-# Ebook Library Manager Skill
+# Tome Keeper Skill
 
 This skill enables you to help users manage their ebook collections through Calibre's metadata tools. You can read and write ebook metadata, organize libraries, clean up missing information, and maintain well-structured book collections.
 

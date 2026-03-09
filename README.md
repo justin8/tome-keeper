@@ -1,10 +1,10 @@
-# Ebook Library Manager
+# Tome Keeper
 
 A skill for managing ebook libraries using Calibre's metadata capabilities.
 
 ## Overview
 
-The Ebook Library Manager skill helps AI agents organize, search, and maintain ebook collections. It wraps Calibre's `ebook-meta` command-line tool through simple shell scripts that output JSON, making it easy for agents to read and write ebook metadata.
+The Tome Keeper skill helps AI agents organize, search, and maintain ebook collections. It wraps Calibre's `ebook-meta` command-line tool through simple shell scripts that output JSON, making it easy for agents to read and write ebook metadata.
 
 **Supported Formats:** EPUB, MOBI, AZW, AZW3
 
@@ -31,9 +31,23 @@ jq is a command-line JSON processor used by the shell scripts.
 
 ## Installation
 
-1. Clone or download this skill to your skills directory
-2. Install the prerequisites (Calibre and jq) as described above
-3. The skill will be automatically available
+### For Kiro
+
+Install this skill by cloning it into your skills directory:
+
+```bash
+git clone https://github.com/justin8/tome-keeper.git ~/.kiro/skills/tome-keeper
+```
+
+### For Claude Code
+
+Install this skill by cloning it into your skills directory:
+
+```bash
+git clone https://github.com/justin8/tome-keeper.git ~/.claude/skills/tome-keeper
+```
+
+Then install the prerequisites (Calibre and jq) as described above. The skill will be automatically available.
 
 ## Documentation
 
@@ -42,7 +56,7 @@ For complete documentation on available tools, workflows, and best practices, se
 ## Project Structure
 
 ```
-ebook-library-manager/
+tome-keeper/
 ├── SKILL.md                    # Complete skill documentation
 ├── README.md                   # This file
 ├── scripts/                    # Shell scripts for ebook operations
