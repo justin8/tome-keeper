@@ -6,15 +6,16 @@ A skill for managing ebook libraries using Calibre's metadata capabilities.
 
 The Tome Keeper skill helps AI agents organize, search, and maintain ebook collections. It wraps Calibre's `ebook-meta` command-line tool through simple shell scripts that output JSON, making it easy for agents to read and write ebook metadata.
 
-**Supported Formats:** EPUB, MOBI, AZW, AZW3
+**Supported Formats:** EPUB, MOBI, AZW, AZW3, M4B (Organization only)
 
 ## Features
 
 - Read and write ebook metadata (title, authors, series, ISBN, description, etc.)
-- Find ebooks in your library using glob patterns
-- Organize ebooks by author, series, or custom structures
+- Find books and audiobooks in your library using glob patterns
+- Organize library with the default structure: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}).{ext}`
+- Store `.m4b` audiobooks and covers alongside ebooks in the same folder
 - Clean up and enrich metadata using web searches
-- Move and delete ebook files safely
+- Move and delete book files safely
 - Platform-aware (macOS and Linux)
 
 ## Prerequisites

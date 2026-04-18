@@ -10,20 +10,20 @@ This skill enables you to help users manage their ebook collections through Cali
 ## Core Capabilities
 
 - Read and write ebook metadata (title, authors, series, ISBN, description, tags, etc.)
-- Find ebook files across directory structures using glob patterns
-- Organize ebooks by author, series, or custom structures
+- Find ebook and audiobook files across directory structures using glob patterns
+- Organize library by author, series, or custom structures
 - Clean up and enrich metadata from online sources
-- Move and delete ebook files safely
-- Support for EPUB, MOBI, AZW, and AZW3 formats
+- Move and delete ebook and audiobook files safely
+- Support for EPUB, MOBI, AZW, AZW3, and M4B formats (metadata reading for ebooks only)
 
 ## When to Use This Skill
 
 Trigger this skill when users ask about:
-- Organizing messy ebook collections
+- Organizing messy ebook and audiobook collections
 - Fixing missing or incorrect metadata
 - Searching for books by title, author, or series
 - Moving books into structured directory hierarchies
-- Finding duplicate ebooks
+- Finding duplicate ebooks or matching audiobooks
 - Batch updating book information
 - Creating author/series folder structures
 - Enriching metadata from online book databases
@@ -41,19 +41,19 @@ jq --version
 
 If either is missing, provide installation instructions based on the user's platform.
 
-### 2. Find Ebooks
+### 2. Find Books and Audiobooks
 
-Use glob patterns or find commands to discover ebook files:
+Use glob patterns or find commands to discover book files:
 
 ```bash
-# Find all ebooks recursively
-find ~/Books -type f \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" \)
+# Find all books and audiobooks recursively
+find ~/Books -type f \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" -o -name "*.m4b" \)
 
 # Find in specific directory
 find ~/Books/Author\ Name -name "*.epub"
 
 # Search by filename pattern
-find ~/Books -type f -iname "*keyword*" \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" \)
+find ~/Books -type f -iname "*keyword*" \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" -o -name "*.m4b" \)
 ```
 
 ### 3. Read Metadata
@@ -63,6 +63,8 @@ Use the read-metadata.sh script to extract metadata from an ebook:
 ```bash
 scripts/read-metadata.sh "/path/to/book.epub"
 ```
+
+*Note: M4B files are not supported by ebook-meta; metadata for these should be inferred from filenames or matched ebook files.*
 
 Expected JSON output:
 ```json
@@ -143,60 +145,77 @@ Writes metadata to an ebook file.
 
 When a user wants to organize their ebook collection, follow this pattern:
 
-1. Find all ebooks in the source directory
-2. Read metadata from each ebook
-3. Determine target path based on author and series
-4. Create target directories and move files
+1. Find all books (ebooks, audiobooks, covers) in the source directory
+2. Read metadata from ebooks to determine the canonical structure
+3. Match audiobooks (.m4b) and covers (.jpg, .png) to the corresponding ebook
+4. Determine target path based on author, series, title, and year
+5. Create target directories and move all associated files together
 
 **Directory structure:**
 ```
 ~/Books/
   ├── Pierce Brown/
   │   └── Red Rising/
-  │       ├── Red Rising/
-  │       │   └── Red Rising - Pierce Brown.epub
-  │       ├── Golden Son/
-  │       │   └── Golden Son - Pierce Brown.epub
-  │       └── Morning Star/
-  │           └── Morning Star - Pierce Brown.epub
+  │       ├── Red Rising (2014)/
+  │       │   ├── Red Rising (2014).epub
+  │       │   ├── Red Rising (2014).m4b
+  │       │   └── cover.jpg
+  │       ├── Golden Son (2015)/
+  │       │   ├── Golden Son (2015).epub
+  │       │   └── cover.jpg
+  │       └── Morning Star (2016)/
+  │           ├── Morning Star (2016).epub
+  │           └── cover.jpg
   └── F. Scott Fitzgerald/
-      └── The Great Gatsby/
-          └── The Great Gatsby - F. Scott Fitzgerald.epub
+      └── The Great Gatsby (1925)/
+          ├── The Great Gatsby (1925).epub
+          └── cover.jpg
 ```
 
 **Folder structure rules:**
-- Top level: `Firstname Lastname/`
-- Series books: `Firstname Lastname/Series Name/Book Title/Book Title - Author Name.ext`
-- Standalone books: `Firstname Lastname/Book Title/Book Title - Author Name.ext`
-- Each book gets its own subfolder for potential companion files (covers, extras)
+- Default format: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}).{ext}`
+- Top level: `{Author}` (normalized to "Firstname Lastname")
+- Sub-level (Optional): `{Series}` if the book is part of a series
+- Book folder: `{Title} ({Year})`
+- Filename: `{Title} ({Year}).{ext}`
+- Associate files: Store `.m4b` audiobooks, `cover.jpg`, and other metadata files in the same Book folder.
 
 **Implementation pattern:**
 ```bash
-# Find all ebooks
-find ~/Downloads/Ebooks -type f \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" \)
+# Find all relevant files
+find ~/Downloads/Ebooks -type f \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" -o -name "*.m4b" -o -name "*.jpg" -o -name "*.png" \)
 
-# For each file:
-for file in files:
+# For each ebook file:
+for file in ebook_files:
   # Read metadata
   result=$(./scripts/read-metadata.sh "$file")
   
-  # Parse JSON and extract author, series, title
+  # Parse JSON and extract author, series, title, and published (year)
   # Format author as "Firstname Lastname"
-  # Determine target path:
-  # - If series: ~/Books/{firstname lastname}/{series}/{title}/{title} - {author}.{ext}
-  # - If no series: ~/Books/{firstname lastname}/{title}/{title} - {author}.{ext}
+  # Extract year from published date (e.g., "2014-01-01" -> "2014")
   
-  # Create target directory and move file
-  mkdir -p "$(dirname "$target_path")"
-  mv "$file" "$target_path"
+  # Determine target directory:
+  # - If series: ~/Books/{Author}/{Series}/{Title} ({Year})/
+  # - If no series: ~/Books/{Author}/{Title} ({Year})/
+  
+  # Determine target filename: {Title} ({Year}).{ext}
+  
+  # Create target directory and move ebook
+  mkdir -p "$target_dir"
+  mv "$file" "$target_dir/$target_filename"
+  
+  # Find and move associated files (m4b, cover, etc.)
+  # Look for files with similar names in the same source directory
 ```
 
 **Handle edge cases:**
 - Books without authors → place in "Unknown Author" directory
 - Books with multiple authors → use first author as primary
 - Author name parsing → convert "Lastname, Firstname" to "Firstname Lastname" format
-- Books without series → create book title folder directly under author
+- Books without series → skip the series subfolder
+- Missing Year → use "Unknown Year" or omit from folder/filename if unavailable
 - Missing metadata → place in "Needs Review" directory for manual inspection
+- Multiple formats → ensure .epub, .m4b, and covers all end up in the same `{Title} ({Year})` folder
 
 ### Workflow 2: Clean Up Missing Metadata
 
@@ -293,7 +312,7 @@ User says: "I just downloaded 'Red Rising.epub' to my Downloads folder. Can you 
 2. Search for "Red Rising Pierce Brown book" online
 3. Find it's book 1 of the Red Rising series
 4. Update metadata: series="Red Rising", series_index=1.0, plus any missing ISBN/publisher/description
-5. Move to ~/Books/Pierce Brown/Red Rising/Red Rising/Red Rising - Pierce Brown.epub
+5. Move to ~/Books/Pierce Brown/Red Rising/Red Rising (2014)/Red Rising (2014).epub
 
 **Key considerations:**
 - Always show the user what metadata will be updated before applying

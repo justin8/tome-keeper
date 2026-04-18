@@ -158,27 +158,43 @@ fi
 echo ""
 
 # Test 5: Organize Library Workflow
-echo "Test 5: Testing organize library workflow..."
+echo "Test 5: Testing organize library workflow with new structure..."
 METADATA_RESULT=$("$PROJECT_ROOT/scripts/read-metadata.sh" "$DOWNLOADS/stellar-voyager.epub")
 AUTHOR=$(echo "$METADATA_RESULT" | jq -r '.metadata."author_s"')
 SERIES=$(echo "$METADATA_RESULT" | jq -r '.metadata.series')
+TITLE=$(echo "$METADATA_RESULT" | jq -r '.metadata.title')
+PUBLISHED=$(echo "$METADATA_RESULT" | jq -r '.metadata.published')
+YEAR=$(echo "$PUBLISHED" | cut -d'-' -f1)
 
+# Basic sanitization
 AUTHOR_CLEAN=$(echo "$AUTHOR" | tr -d '<>:"/\\|?*' | tr -s ' ')
 SERIES_CLEAN=$(echo "$SERIES" | tr -d '<>:"/\\|?*' | tr -s ' ')
+TITLE_CLEAN=$(echo "$TITLE" | tr -d '<>:"/\\|?*' | tr -s ' ')
 
-if [[ "$SERIES" != "None" ]] && [[ -n "$SERIES" ]]; then
-    TARGET_DIR="$ORGANIZED/$AUTHOR_CLEAN/$SERIES_CLEAN"
+if [[ -n "$SERIES_CLEAN" ]] && [[ "$SERIES_CLEAN" != "null" ]]; then
+    TARGET_DIR="$ORGANIZED/$AUTHOR_CLEAN/$SERIES_CLEAN/$TITLE_CLEAN ($YEAR)"
 else
-    TARGET_DIR="$ORGANIZED/$AUTHOR_CLEAN"
+    TARGET_DIR="$ORGANIZED/$AUTHOR_CLEAN/$TITLE_CLEAN ($YEAR)"
 fi
 
 mkdir -p "$TARGET_DIR"
-cp "$DOWNLOADS/stellar-voyager.epub" "$TARGET_DIR/stellar-voyager.epub"
 
-if [[ -f "$TARGET_DIR/stellar-voyager.epub" ]]; then
-    echo "✓ Successfully organized ebook"
+# Move ebook
+cp "$DOWNLOADS/stellar-voyager.epub" "$TARGET_DIR/$TITLE_CLEAN ($YEAR).epub"
+
+# Create dummy associated files
+touch "$DOWNLOADS/stellar-voyager.m4b"
+touch "$DOWNLOADS/cover.jpg"
+
+# Move associated files
+mv "$DOWNLOADS/stellar-voyager.m4b" "$TARGET_DIR/$TITLE_CLEAN ($YEAR).m4b"
+mv "$DOWNLOADS/cover.jpg" "$TARGET_DIR/cover.jpg"
+
+if [[ -f "$TARGET_DIR/$TITLE_CLEAN ($YEAR).epub" ]] && [[ -f "$TARGET_DIR/$TITLE_CLEAN ($YEAR).m4b" ]] && [[ -f "$TARGET_DIR/cover.jpg" ]]; then
+    echo "✓ Successfully organized ebook with m4b and cover in new structure"
+    echo "  Path: $TARGET_DIR/"
 else
-    echo "✗ Failed to organize ebook"
+    echo "✗ Failed to organize ebook in new structure"
     exit 1
 fi
 echo ""
