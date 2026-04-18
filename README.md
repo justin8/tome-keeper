@@ -12,7 +12,7 @@ The Tome Keeper skill helps AI agents organize, search, and maintain ebook colle
 
 - Read and write ebook metadata (title, authors, series, ISBN, description, etc.)
 - Find books and audiobooks in your library using glob patterns
-- Organize library with the default structure: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}).{ext}`
+- Organize library with the default structure: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}) - {Author}.{ext}`
 - Store `.m4b` audiobooks and covers alongside ebooks in the same folder
 - Clean up and enrich metadata using web searches
 - Move and delete book files safely

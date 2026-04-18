@@ -157,28 +157,28 @@ When a user wants to organize their ebook collection, follow this pattern:
   ├── Pierce Brown/
   │   └── Red Rising/
   │       ├── Red Rising (2014)/
-  │       │   ├── Red Rising (2014).epub
-  │       │   ├── Red Rising (2014).m4b
+  │       │   ├── Red Rising (2014) - Pierce Brown.epub
+  │       │   ├── Red Rising (2014) - Pierce Brown.m4b
   │       │   └── cover.jpg
   │       ├── Golden Son (2015)/
-  │       │   ├── Golden Son (2015).epub
+  │       │   ├── Golden Son (2015) - Pierce Brown.epub
   │       │   └── cover.jpg
   │       └── Morning Star (2016)/
-  │           ├── Morning Star (2016).epub
+  │           ├── Morning Star (2016) - Pierce Brown.epub
   │           └── cover.jpg
   └── F. Scott Fitzgerald/
       └── The Great Gatsby (1925)/
-          ├── The Great Gatsby (1925).epub
+          ├── The Great Gatsby (1925) - F. Scott Fitzgerald.epub
           └── cover.jpg
 ```
 
 **Folder structure rules:**
-- Default format: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}).{ext}`
+- Default format: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}) - {Author}.{ext}`
 - Top level: `{Author}` (normalized to "Firstname Lastname")
 - Sub-level (Optional): `{Series}` if the book is part of a series
 - Book folder: `{Title} ({Year})`
-- Filename: `{Title} ({Year}).{ext}`
-- Associate files: Store `.m4b` audiobooks, `cover.jpg`, and other metadata files in the same Book folder.
+- Filename: `{Title} ({Year}) - {Author}.{ext}`
+- Associate files: Store `.m4b` audiobooks, `cover.jpg`, and other metadata files in the same Book folder using the same `{Title} ({Year}) - {Author}.{ext}` naming convention where possible.
 
 **Implementation pattern:**
 ```bash
