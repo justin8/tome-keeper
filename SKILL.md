@@ -151,7 +151,7 @@ When a user wants to organize their ebook collection, follow this pattern:
 **Directory structure:**
 ```
 ~/Books/
-  ├── Brown, Pierce/
+  ├── Pierce Brown/
   │   └── Red Rising/
   │       ├── Red Rising/
   │       │   └── Red Rising - Pierce Brown.epub
@@ -159,15 +159,15 @@ When a user wants to organize their ebook collection, follow this pattern:
   │       │   └── Golden Son - Pierce Brown.epub
   │       └── Morning Star/
   │           └── Morning Star - Pierce Brown.epub
-  └── Fitzgerald, F. Scott/
+  └── F. Scott Fitzgerald/
       └── The Great Gatsby/
           └── The Great Gatsby - F. Scott Fitzgerald.epub
 ```
 
 **Folder structure rules:**
-- Top level: `Lastname, Firstname/`
-- Series books: `Lastname, Firstname/Series Name/Book Title/Book Title - Author Name.ext`
-- Standalone books: `Lastname, Firstname/Book Title/Book Title - Author Name.ext`
+- Top level: `Firstname Lastname/`
+- Series books: `Firstname Lastname/Series Name/Book Title/Book Title - Author Name.ext`
+- Standalone books: `Firstname Lastname/Book Title/Book Title - Author Name.ext`
 - Each book gets its own subfolder for potential companion files (covers, extras)
 
 **Implementation pattern:**
@@ -181,10 +181,10 @@ for file in files:
   result=$(./scripts/read-metadata.sh "$file")
   
   # Parse JSON and extract author, series, title
-  # Format author as "Lastname, Firstname"
+  # Format author as "Firstname Lastname"
   # Determine target path:
-  # - If series: ~/Books/{lastname, firstname}/{series}/{title}/{title} - {author}.{ext}
-  # - If no series: ~/Books/{lastname, firstname}/{title}/{title} - {author}.{ext}
+  # - If series: ~/Books/{firstname lastname}/{series}/{title}/{title} - {author}.{ext}
+  # - If no series: ~/Books/{firstname lastname}/{title}/{title} - {author}.{ext}
   
   # Create target directory and move file
   mkdir -p "$(dirname "$target_path")"
@@ -194,7 +194,7 @@ for file in files:
 **Handle edge cases:**
 - Books without authors → place in "Unknown Author" directory
 - Books with multiple authors → use first author as primary
-- Author name parsing → convert "Firstname Lastname" to "Lastname, Firstname" format
+- Author name parsing → convert "Lastname, Firstname" to "Firstname Lastname" format
 - Books without series → create book title folder directly under author
 - Missing metadata → place in "Needs Review" directory for manual inspection
 
@@ -293,7 +293,7 @@ User says: "I just downloaded 'Red Rising.epub' to my Downloads folder. Can you 
 2. Search for "Red Rising Pierce Brown book" online
 3. Find it's book 1 of the Red Rising series
 4. Update metadata: series="Red Rising", series_index=1.0, plus any missing ISBN/publisher/description
-5. Move to ~/Books/Brown, Pierce/Red Rising/Red Rising/Red Rising - Pierce Brown.epub
+5. Move to ~/Books/Pierce Brown/Red Rising/Red Rising/Red Rising - Pierce Brown.epub
 
 **Key considerations:**
 - Always show the user what metadata will be updated before applying
@@ -426,7 +426,9 @@ Always check the `status` field in script output:
 
 4. **Use web sources for accuracy**: Cross-reference metadata with Open Library or Google Books.
 
-5. **Follow Calibre conventions**: 
+5. **Author Name Formatting**: Always use "Firstname Lastname" format for author names in library structures and metadata updates. If metadata is found in "Lastname, Firstname" format, convert it to "Firstname Lastname" before using it for file paths or writing back to the file.
+
+6. **Follow Calibre conventions**: 
    - Use " & " for multiple authors
    - Use decimal format for series_index (1.0, 2.0, 3.0 for main entries)
    - Use decimal values between integers (2.5, 3.7) for books between major releases like novellas, short stories, or side stories
@@ -448,9 +450,10 @@ Always check the `status` field in script output:
 ## Troubleshooting
 
 ### Books organized under wrong author
-The metadata might have author in "Last, First" format. Parse and normalize:
+If metadata has authors in "Lastname, Firstname" format, the book might be placed in an unexpected directory. Always normalize to "Firstname Lastname":
 ```bash
-# Convert "Last, First" to "First Last"
+# Example conversion: "Brown, Pierce" -> "Pierce Brown"
+echo "Brown, Pierce" | awk -F', ' '{if (NF==2) print $2 " " $1; else print $0}'
 ```
 
 ### Series directories have inconsistent names
