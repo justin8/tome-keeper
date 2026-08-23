@@ -29,10 +29,14 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
-# Check if file is writable
-if [[ ! -w "$file" ]]; then
+# Create a temporary file for safe/atomic editing (handles network mounts like SMB)
+ext="${file##*.}"
+tmp_file=$(mktemp "${TMPDIR:-/tmp}/ebook_meta_XXXXXX.${ext}")
+trap 'rm -f "$tmp_file"' EXIT
+
+if ! cp "$file" "$tmp_file" 2>/dev/null; then
   file_json=$(echo -n "$file" | jq -Rs .)
-  echo "{\"status\":\"error\",\"message\":\"File is not writable (permission denied): $file\",\"path\":$file_json}"
+  echo "{\"status\":\"error\",\"message\":\"Failed to read source file: $file\",\"path\":$file_json}"
   exit 1
 fi
 
@@ -159,8 +163,8 @@ if html_description=$(echo "$metadata" | jq -r '.html_description // empty' 2>/d
   fi
 fi
 
-# Add the file path as the last argument
-cmd+=("$file")
+# Add the temporary file path as the last argument
+cmd+=("$tmp_file")
 
 # Check if we have any metadata fields to update (more than just command and file)
 if [[ ${#cmd[@]} -eq 2 ]]; then
@@ -179,6 +183,21 @@ if [[ $exit_code -ne 0 ]]; then
   file_json=$(echo -n "$file" | jq -Rs .)
   command_json=$(echo -n "${cmd[*]}" | jq -Rs .)
   echo "{\"status\":\"error\",\"message\":\"Failed to write metadata to ebook file\",\"path\":$file_json,\"command\":$command_json,\"command_output\":$output_escaped,\"exit_code\":$exit_code}"
+  exit 1
+fi
+
+# Copy updated temp file back to destination (using atomic replace if possible)
+target_dir="$(dirname "$file")"
+target_tmp="$target_dir/.tmp_write_$(basename "$file")"
+if cp "$tmp_file" "$target_tmp" 2>/dev/null; then
+  mv -f "$target_tmp" "$file" 2>/dev/null || cp -f "$tmp_file" "$file"
+else
+  cp -f "$tmp_file" "$file"
+fi
+
+if [[ $? -ne 0 ]]; then
+  file_json=$(echo -n "$file" | jq -Rs .)
+  echo "{\"status\":\"error\",\"message\":\"Failed to copy updated ebook back to destination\",\"path\":$file_json}"
   exit 1
 fi
 
