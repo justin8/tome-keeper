@@ -32,6 +32,20 @@ jq is a command-line JSON processor used by the shell scripts.
 
 ## Installation
 
+### For Antigravity
+
+Install this skill by cloning it into your global skills directory:
+
+```bash
+git clone https://github.com/justin8/tome-keeper.git ~/.gemini/config/skills/tome-keeper
+```
+
+Or for a specific project/workspace:
+
+```bash
+git clone https://github.com/justin8/tome-keeper.git .agents/skills/tome-keeper
+```
+
 ### For Kiro
 
 Install this skill by cloning it into your skills directory:
