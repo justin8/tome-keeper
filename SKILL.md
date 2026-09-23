@@ -10,6 +10,7 @@ This skill enables you to help users manage their ebook collections through Cali
 ## Core Capabilities
 
 - Read and write ebook metadata (title, authors, series, ISBN, description, tags, etc.)
+- Query rich book metadata, reading orders, series, tags, and covers from the Hardcover GraphQL API
 - Find ebook and audiobook files across directory structures using glob patterns
 - Organize library by author, series, or custom structures
 - Clean up and enrich metadata from online sources
@@ -26,7 +27,7 @@ Trigger this skill when users ask about:
 - Finding duplicate ebooks or matching audiobooks
 - Batch updating book information
 - Creating author/series folder structures
-- Enriching metadata from online book databases
+- Enriching metadata from online book databases (Hardcover, Open Library, Google Books)
 
 ## Getting Started
 
@@ -41,7 +42,32 @@ jq --version
 
 If either is missing, provide installation instructions based on the user's platform.
 
-### 2. Find Books and Audiobooks
+### 2. Configure Hardcover API (Recommended)
+
+Tome Keeper uses [Hardcover](https://hardcover.app) for high-accuracy book search, series information, decimal reading order positions, tags, and cover images. Hardcover requires an API personal access token.
+
+**Obtaining a token:** Users can generate a token at [https://hardcover.app/account/api](https://hardcover.app/account/api).
+
+**Configuration methods (resolved in order):**
+1. **CLI Flag:** Pass `--api-key "<token>"` directly to `fetch-hardcover.sh`
+2. **Environment Variable:** Export in shell or session:
+   ```bash
+   export HARDCOVER_API_KEY="hc_pat_..."
+   ```
+3. **User Global Config:** Save once to user profile (persists across workspaces):
+   ```bash
+   mkdir -p ~/.config/tome-keeper
+   echo "HARDCOVER_API_KEY=hc_pat_..." > ~/.config/tome-keeper/credentials
+   chmod 600 ~/.config/tome-keeper/credentials
+   ```
+4. **Local Workspace `.env`:** Add `HARDCOVER_API_KEY=hc_pat_...` to `.env` in the repository root.
+
+**Handling Missing API Keys:**
+If `scripts/fetch-hardcover.sh` returns `MISSING_API_KEY`:
+- Inform the user that Hardcover provides rich series and metadata data, and ask if they'd like to provide an API key (or configure `~/.config/tome-keeper/credentials`).
+- Alternatively, offer to fall back to unauthenticated public providers (Open Library / Google Books) or web search.
+
+### 3. Find Books and Audiobooks
 
 Use glob patterns or find commands to discover book files:
 
@@ -56,7 +82,7 @@ find ~/Books/Author\ Name -name "*.epub"
 find ~/Books -type f -iname "*keyword*" \( -name "*.epub" -o -name "*.mobi" -o -name "*.azw" -o -name "*.azw3" -o -name "*.m4b" \)
 ```
 
-### 3. Read Metadata
+### 4. Read Metadata
 
 Use the read-metadata.sh script to extract metadata from an ebook:
 
@@ -89,7 +115,7 @@ Expected JSON output:
 
 Always check the `status` field before processing metadata.
 
-### 4. Write Metadata
+### 5. Write Metadata
 
 Use the write-metadata.sh script to update metadata:
 
@@ -101,7 +127,7 @@ Only specified fields are updated; other metadata is preserved.
 
 ## Available Scripts
 
-The skill provides three shell scripts in the `scripts/` directory:
+The skill provides four shell scripts in the `scripts/` directory:
 
 ### check-calibre.sh
 Verifies Calibre installation and returns version information.
@@ -138,6 +164,21 @@ Writes metadata to an ebook file.
 - Series index is formatted as decimal (e.g., 1.0, 2.0, 3.0)
 - Use decimal values (e.g., 2.5, 3.7) for books between major releases like novellas, short stories, or side stories that fall between main series entries
 - Special characters are properly escaped by the script
+
+### fetch-hardcover.sh
+Queries the Hardcover GraphQL API for rich book metadata, series reading order positions, ISBNs, descriptions, tags, and high-resolution covers.
+
+**Parameters:**
+- `--query, -q <string>`: Search query (e.g. title and author keywords)
+- `--isbn, -i <string>`: Search by ISBN-10 or ISBN-13
+- `--title, -t <string>`: Book title
+- `--author, -a <string>`: Author name
+- `--limit, -l <number>`: Number of results (default: 5)
+- `--api-key, -k <token>`: Hardcover API personal access token (optional if configured via env or `~/.config/tome-keeper/credentials`)
+- `--raw`: Output raw GraphQL response
+
+**Convenience feature:**
+Each item in `.results[]` contains a pre-built `.calibre_metadata` object that can be passed directly into `scripts/write-metadata.sh`.
 
 ## Common Workflows
 
@@ -222,7 +263,7 @@ for file in ebook_files:
 When users want to fix missing or incorrect metadata:
 
 1. Scan library for books with incomplete metadata
-2. Use web_search to find accurate information
+2. Use `scripts/fetch-hardcover.sh` (or web search fallback) to find accurate information
 3. Extract metadata from search results or book databases
 4. Update ebook files with corrected information
 
@@ -236,23 +277,28 @@ When users want to fix missing or incorrect metadata:
 # - Missing series info (if applicable)
 ```
 
-**Search for book information:**
+**Search for book information using Hardcover (Primary):**
 ```bash
-# Build search query from available metadata
-query="${title} ${author} book"
+# Query by title and author
+scripts/fetch-hardcover.sh --query "${title} ${author}" --limit 1
 
-# Search online
-remote_web_search("$query")
-
-# Or search by ISBN for most accurate results
-remote_web_search("ISBN ${isbn}")
+# Or query directly by ISBN if available (fastest and most accurate)
+scripts/fetch-hardcover.sh --isbn "${isbn}" --limit 1
 ```
 
-**Extract and apply updates:**
-- Look for Open Library, Goodreads, or Google Books results
-- Extract ISBN, publisher, publication date, series info
-- Use conservative updates (only fill missing fields)
-- Verify information matches before applying
+**Apply updates directly using calibre_metadata:**
+```bash
+# Extract the pre-built calibre_metadata JSON and pipe to write-metadata.sh
+calibre_meta=$(scripts/fetch-hardcover.sh --query "${title} ${author}" --limit 1 | jq -c '.results[0].calibre_metadata')
+
+# Apply to file
+scripts/write-metadata.sh "/path/to/book.epub" "$calibre_meta"
+```
+
+**Fallback when Hardcover token is not configured:**
+- Web search: `remote_web_search("${title} ${author} book")` or `remote_web_search("ISBN ${isbn}")`
+- Open Library API: `curl -s "https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data"`
+- Google Books API: `curl -s "https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}"`
 
 **Rate limiting:** Add delays between web searches (2-3 seconds) to avoid being blocked.
 
@@ -276,16 +322,20 @@ Help users identify duplicate ebooks:
 
 When users want to add missing information:
 
-1. Read current metadata
-2. Search for book by title/author or ISBN
-3. Fetch detailed information from book databases
-4. Update with publisher, publication date, description, tags
+1. Read current metadata from ebook
+2. Search for book by title/author or ISBN using `scripts/fetch-hardcover.sh`
+3. Fetch detailed information: series name, decimal series index, tags, descriptions, cover image
+4. Update ebook with enriched metadata
 5. Optionally download and embed cover images
 
 **Reliable sources:**
-- Open Library API: `https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data`
-- Google Books API: `https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}`
-- Goodreads (via web scraping)
+- **Hardcover API (Primary)**: `scripts/fetch-hardcover.sh --query "${title} ${author}"`
+  - High quality series numbering, decimal indices (e.g. 2.5 for novellas)
+  - Book genres and descriptive tags
+  - Cover image URLs
+- **Open Library API**: `https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data`
+- **Google Books API**: `https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}`
+- **Goodreads**: (via web search)
 
 **Best practices:**
 - Prefer ISBN lookups over title/author searches
@@ -529,6 +579,7 @@ All scripts are in the `scripts/` directory relative to the skill root:
 - `scripts/check-calibre.sh`
 - `scripts/read-metadata.sh`
 - `scripts/write-metadata.sh`
+- `scripts/fetch-hardcover.sh`
 
 The scripts handle platform detection (macOS vs Linux) and path expansion automatically.
 

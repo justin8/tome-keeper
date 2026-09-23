@@ -82,5 +82,58 @@ validate_ebook_file() {
   return 0
 }
 
+# Retrieve Hardcover API key from environment, user config, or .env files
+get_hardcover_api_key() {
+  local key="${HARDCOVER_API_KEY:-${HARDCOVER_TOKEN:-}}"
+  
+  if [[ -n "$key" ]]; then
+    echo "$key"
+    return 0
+  fi
+
+  # Check XDG config or ~/.config/tome-keeper/credentials
+  local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/tome-keeper"
+  if [[ -f "$config_dir/credentials" ]]; then
+    local cred
+    cred=$(grep -E '^(HARDCOVER_API_KEY|HARDCOVER_TOKEN)=' "$config_dir/credentials" 2>/dev/null | head -n 1 | cut -d '=' -f2- | tr -d '"'\'' ')
+    if [[ -z "$cred" ]]; then
+      cred=$(head -n 1 "$config_dir/credentials" 2>/dev/null | tr -d '\r\n ')
+      if [[ "$cred" =~ ^(HARDCOVER|#) ]]; then cred=""; fi
+    fi
+    if [[ -n "$cred" ]]; then
+      echo "$cred"
+      return 0
+    fi
+  fi
+
+  # Check config.json
+  if [[ -f "$config_dir/config.json" ]] && command -v jq &>/dev/null; then
+    local cred
+    cred=$(jq -r '.hardcover_api_key // .hardcover_token // empty' "$config_dir/config.json" 2>/dev/null)
+    if [[ -n "$cred" ]]; then
+      echo "$cred"
+      return 0
+    fi
+  fi
+
+  # Check .env in current directory or project root
+  local script_root
+  script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
+  local env_files=(".env" "$script_root/.env")
+  for env_file in "${env_files[@]}"; do
+    if [[ -f "$env_file" ]]; then
+      local cred
+      cred=$(grep -E '^(HARDCOVER_API_KEY|HARDCOVER_TOKEN)=' "$env_file" 2>/dev/null | head -n 1 | cut -d '=' -f2- | tr -d '"'\'' ')
+      if [[ -n "$cred" ]]; then
+        echo "$cred"
+        return 0
+      fi
+    fi
+  done
+
+  echo ""
+  return 1
+}
+
 # Export the ebook-meta command for use in other scripts
 export EBOOK_META_CMD=$(get_ebook_meta_cmd)

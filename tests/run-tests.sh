@@ -314,6 +314,70 @@ else
 fi
 echo ""
 
+# Test 14: Hardcover Missing Token Error Handling
+echo "Test 14: Testing Hardcover missing token handling..."
+NO_KEY_RESULT=$(env -u HARDCOVER_API_KEY -u HARDCOVER_TOKEN HOME="/tmp/nonexistent-home" XDG_CONFIG_HOME="/tmp/nonexistent-xdg" "$PROJECT_ROOT/scripts/fetch-hardcover.sh" --query "Test" 2>&1 || true)
+if echo "$NO_KEY_RESULT" | jq -e '.error_code == "MISSING_API_KEY"' > /dev/null 2>&1; then
+    echo "✓ Missing Hardcover token correctly returns MISSING_API_KEY error"
+else
+    echo "✗ Hardcover missing token test failed"
+    echo "$NO_KEY_RESULT"
+    exit 1
+fi
+echo ""
+
+# Test 15: Hardcover Token Discovery from Config File
+echo "Test 15: Testing Hardcover credential discovery..."
+TMP_CONF_DIR="/tmp/tome-keeper-test-conf"
+mkdir -p "$TMP_CONF_DIR"
+echo "HARDCOVER_API_KEY=dummy_test_token" > "$TMP_CONF_DIR/credentials"
+DISCOVERED_KEY=$(env -u HARDCOVER_API_KEY -u HARDCOVER_TOKEN -u XDG_CONFIG_HOME HOME="/tmp/fake-home" bash -c "
+  mkdir -p /tmp/fake-home/.config/tome-keeper
+  cp $TMP_CONF_DIR/credentials /tmp/fake-home/.config/tome-keeper/credentials
+  source $PROJECT_ROOT/scripts/common.sh
+  get_hardcover_api_key
+")
+rm -rf "$TMP_CONF_DIR" /tmp/fake-home
+if [[ "$DISCOVERED_KEY" == "dummy_test_token" ]]; then
+    echo "✓ Credential discovery from user config works"
+else
+    echo "✗ Credential discovery failed: got '$DISCOVERED_KEY'"
+    exit 1
+fi
+echo ""
+
+# Test 16: Hardcover Live Query and Metadata Write Integration
+echo "Test 16: Testing Hardcover API query and write integration..."
+source "$PROJECT_ROOT/scripts/common.sh"
+HC_KEY=$(get_hardcover_api_key || true)
+if [[ -n "$HC_KEY" ]]; then
+    HC_RESULT=$("$PROJECT_ROOT/scripts/fetch-hardcover.sh" --query "Red Rising Pierce Brown" --limit 1 --api-key "$HC_KEY")
+    if echo "$HC_RESULT" | jq -e '.status == "success" and .count > 0' > /dev/null 2>&1; then
+        HC_TITLE=$(echo "$HC_RESULT" | jq -r '.results[0].title')
+        HC_SERIES=$(echo "$HC_RESULT" | jq -r '.results[0].series')
+        echo "✓ Hardcover API query returned: '$HC_TITLE' (Series: $HC_SERIES)"
+        
+        # Test piping calibre_metadata into write-metadata.sh
+        CALIBRE_META=$(echo "$HC_RESULT" | jq -c '.results[0].calibre_metadata')
+        "$PROJECT_ROOT/scripts/write-metadata.sh" "$DOWNLOADS/stellar-voyager.epub" "$CALIBRE_META" > /dev/null
+        VERIFY_WRITE=$("$PROJECT_ROOT/scripts/read-metadata.sh" "$DOWNLOADS/stellar-voyager.epub")
+        VERIFY_TITLE=$(echo "$VERIFY_WRITE" | jq -r '.metadata.title')
+        if [[ "$VERIFY_TITLE" == "$HC_TITLE" ]]; then
+            echo "✓ Hardcover metadata successfully written to EPUB"
+        else
+            echo "✗ Failed to verify Hardcover metadata written to EPUB"
+            exit 1
+        fi
+    else
+        echo "✗ Hardcover API query failed"
+        echo "$HC_RESULT" | jq .
+        exit 1
+    fi
+else
+    echo "⊘ Skipped live Hardcover query (HARDCOVER_API_KEY not set)"
+fi
+echo ""
+
 # ============================================
 # SUMMARY
 # ============================================
@@ -336,4 +400,9 @@ echo "  ✓ Error handling (unsupported format)"
 echo "  ✓ Special characters"
 echo "  ✓ Multiple authors"
 echo "  ✓ Series index formatting"
+echo "  ✓ Hardcover missing token handling"
+echo "  ✓ Hardcover credential discovery"
+if [[ -n "$HC_KEY" ]]; then
+echo "  ✓ Hardcover live query and metadata write"
+fi
 echo ""

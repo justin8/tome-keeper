@@ -11,24 +11,36 @@ The Tome Keeper skill helps AI agents organize, search, and maintain ebook colle
 ## Features
 
 - Read and write ebook metadata (title, authors, series, ISBN, description, etc.)
+- Query rich metadata, series reading order, tags, and covers from [Hardcover](https://hardcover.app) API
 - Find books and audiobooks in your library using glob patterns
 - Organize library with the default structure: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}) - {Author}.{ext}`
 - Store `.m4b` audiobooks and covers alongside ebooks in the same folder
-- Clean up and enrich metadata using web searches
+- Clean up and enrich metadata using Hardcover or web searches
 - Move and delete book files safely
 - Platform-aware (macOS and Linux)
 
 ## Prerequisites
 
-Before using this power, you need to install two external dependencies:
+- **Calibre**: Provides the `ebook-meta` command-line tool for reading and writing ebook metadata.
+- **jq**: Command-line JSON processor used by the shell scripts.
+- **curl**: Used for querying online book metadata APIs.
 
-### 1. Calibre
+## Configuration (Optional)
 
-Calibre provides the `ebook-meta` command-line tool for reading and writing ebook metadata.
+### Hardcover API Token
 
-### 2. jq
+Tome Keeper supports searching and enriching metadata from [Hardcover](https://hardcover.app) via their GraphQL API.
 
-jq is a command-line JSON processor used by the shell scripts.
+1. Get a personal access token at [https://hardcover.app/account/api](https://hardcover.app/account/api).
+2. Configure it in any of the following ways (checked in priority order):
+   - **Environment Variable**: `export HARDCOVER_API_KEY="your_token"`
+   - **User Config**: Save to `~/.config/tome-keeper/credentials`:
+     ```bash
+     mkdir -p ~/.config/tome-keeper
+     echo "HARDCOVER_API_KEY=your_token" > ~/.config/tome-keeper/credentials
+     ```
+   - **Local `.env`**: Copy `.env.example` to `.env` and fill in `HARDCOVER_API_KEY`.
+   - **CLI Flag**: Pass `--api-key "your_token"` to `fetch-hardcover.sh`.
 
 ## Installation
 
@@ -74,11 +86,13 @@ For complete documentation on available tools, workflows, and best practices, se
 tome-keeper/
 ├── SKILL.md                    # Complete skill documentation
 ├── README.md                   # This file
+├── .env.example                # Example configuration template
 ├── scripts/                    # Shell scripts for ebook operations
 │   ├── common.sh              # Shared utilities and platform detection
 │   ├── check-calibre.sh       # Verify Calibre installation
 │   ├── read-metadata.sh       # Read ebook metadata
-│   └── write-metadata.sh      # Write ebook metadata
+│   ├── write-metadata.sh      # Write ebook metadata
+│   └── fetch-hardcover.sh     # Fetch metadata from Hardcover API
 └── tests/                      # Comprehensive test suite
 ```
 
