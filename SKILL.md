@@ -1,11 +1,11 @@
 ---
 name: tome-keeper
-description: Manage ebook libraries using Calibre's ebook-meta tool. Use this skill when users mention organizing ebooks, fixing book metadata, managing EPUB/MOBI/AZW files, searching their book collection, cleaning up library metadata, or working with Calibre. Also trigger for tasks involving book titles, authors, series information, ISBNs, or organizing digital reading collections.
+description: Manage ebook and audiobook libraries using Calibre's ebook-meta tool and media utilities. Use this skill when users mention organizing ebooks or audiobooks, converting audiobooks to M4B, fixing book metadata, managing EPUB/MOBI/AZW/M4B files, searching their book collection, cleaning up library metadata, or working with Calibre. Also trigger for tasks involving book titles, authors, series information, ISBNs, or organizing digital reading collections.
 ---
 
 # Tome Keeper Skill
 
-This skill enables you to help users manage their ebook collections through Calibre's metadata tools. You can read and write ebook metadata, organize libraries, clean up missing information, and maintain well-structured book collections.
+This skill enables you to help users manage their ebook and audiobook collections through Calibre's metadata tools and audio conversion utilities. You can read and write ebook metadata, organize libraries, clean up missing information, convert audiobooks, and maintain well-structured book collections.
 
 ## Core Capabilities
 
@@ -14,6 +14,8 @@ This skill enables you to help users manage their ebook collections through Cali
 - Find ebook and audiobook files across directory structures using glob patterns
 - Organize library by author, series, or custom structures
 - Clean up and enrich metadata from online sources
+- Convert audiobook files (MP3 multi-chapter or single file) to .m4b with chapter markers, cover art, and metadata
+- Strict audiobook naming enforcement: ensure `.m4b` files strictly match the book's filename (`{Title} ({Year}) - {Author}.m4b`) without symlinks
 - Move and delete ebook and audiobook files safely
 - Support for EPUB, MOBI, AZW, AZW3, and M4B formats (metadata reading for ebooks only)
 
@@ -21,6 +23,7 @@ This skill enables you to help users manage their ebook collections through Cali
 
 Trigger this skill when users ask about:
 - Organizing messy ebook and audiobook collections
+- Converting, chapterizing, or organizing audiobook files (.m4b, .mp3, .m3u)
 - Fixing missing or incorrect metadata
 - Searching for books by title, author, or series
 - Moving books into structured directory hierarchies
@@ -219,7 +222,10 @@ When a user wants to organize their ebook collection, follow this pattern:
 - Sub-level (Optional): `{Series}` if the book is part of a series
 - Book folder: `{Title} ({Year})`
 - Filename: `{Title} ({Year}) - {Author}.{ext}`
-- Associate files: Store `.m4b` audiobooks, `cover.jpg`, and other metadata files in the same Book folder using the same `{Title} ({Year}) - {Author}.{ext}` naming convention where possible.
+- Audiobooks (`.m4b`): MUST be named identically to the book: `{Title} ({Year}) - {Author}.m4b` (e.g. `The Martian (2014) - Andy Weir.m4b`).
+  - NEVER name audiobooks as `{Author} - {Title}.m4b`.
+  - NEVER create symlinks (e.g. do not create `{Title} ({Year}) - {Author}.m4b -> {Author} - {Title}.m4b` symlinks or vice versa). Keep only the single canonical `{Title} ({Year}) - {Author}.m4b` file directly in the book folder.
+- Associate files: Store `.m4b` audiobooks, `cover.jpg`, and other metadata files in the same Book folder using the same `{Title} ({Year}) - {Author}.{ext}` naming convention.
 
 **Implementation pattern:**
 ```bash
@@ -369,6 +375,44 @@ User says: "I just downloaded 'Red Rising.epub' to my Downloads folder. Can you 
 - Confirm the target location before moving
 - Handle cases where the book already exists at target (ask to overwrite or rename)
 - If metadata is already complete, skip directly to organizing
+
+### Workflow 6: Converting and Adding Audiobooks (.m4b)
+
+When a user wants to convert or import audiobooks (e.g. from multi-chapter MP3s, M3U playlists, or raw audio files into `.m4b`):
+
+1. **Locate or match target book directory**:
+   - Identify the book folder in the library: `{Author}/{Series/}{Title} ({Year})/`.
+   - If an ebook (`.epub`, `.opf`, etc.) is already present, inspect its filename to ensure the audiobook matches identically.
+
+2. **Audiobook naming rules (strict)**:
+   - Filename must be: `{Title} ({Year}) - {Author}.m4b` (e.g., `The Martian (2014) - Andy Weir.m4b`).
+   - Do NOT name it `{Author} - {Title}.m4b`.
+   - Do NOT create symlinks between naming conventions. Only store the single, properly named `.m4b` file.
+
+3. **Conversion & Assembly (FFmpeg)**:
+   - **For multi-part MP3 files**:
+     - Pre-encode chapters in parallel across available CPU cores to AAC (`.m4a`) to avoid long-running tool timeouts on multi-hour audiobooks:
+       `ffmpeg -y -i "Ch.XX.mp3" -c:a aac -b:a 64k "Ch.XX.m4a"`
+     - Probe track durations with `ffprobe` to compute chapter boundaries in milliseconds (`TIMEBASE=1/1000`).
+     - Generate an `FFMETADATA1` file containing `[CHAPTER]` blocks (`START=...`, `END=...`, `title=Chapter XX`) as well as global tags (`title`, `artist`, `album_artist`, `album`, `date`, `genre=Audiobook`).
+     - Concat-mux the encoded parts losslessly with chapter metadata and cover art into `.m4b` (`-f ipod`):
+       ```bash
+       ffmpeg -y -f concat -safe 0 -i concat.txt \
+         -i metadata.txt \
+         -i cover.jpg \
+         -map 0:a -map 2:v \
+         -map_metadata 1 \
+         -c:a copy -c:v copy \
+         -disposition:v:0 attached_pic \
+         -f ipod \
+         "${TARGET_DIR}/${TITLE} (${YEAR}) - ${AUTHOR}.m4b"
+       ```
+   - **For single-file audio**:
+     - Transcode or repackage directly into `.m4b` with `-f ipod`, embedded cover image (`-c:v copy -disposition:v:0 attached_pic`), and chapter markers.
+
+4. **Verify output**:
+   - Run `ffprobe` to verify audio stream, duration, embedded cover image (`attached pic`), and chapter count.
+   - Clean up temporary files in `/tmp`.
 
 ## Handling Special Cases
 

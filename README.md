@@ -14,7 +14,7 @@ The Tome Keeper skill helps AI agents organize, search, and maintain ebook colle
 - Query rich metadata, series reading order, tags, and covers from [Hardcover](https://hardcover.app) API
 - Find books and audiobooks in your library using glob patterns
 - Organize library with the default structure: `{Author}/{Series/}{Title} ({Year})/{Title} ({Year}) - {Author}.{ext}`
-- Store `.m4b` audiobooks and covers alongside ebooks in the same folder
+- Store and convert `.m4b` audiobooks (with embedded cover art and chapters), strictly named `{Title} ({Year}) - {Author}.m4b` matching the book files without symlinks
 - Clean up and enrich metadata using Hardcover or web searches
 - Move and delete book files safely
 - Platform-aware (macOS and Linux)
